@@ -7,6 +7,7 @@ from utils import load_dataset, load_train_config, get_processed_elife_data
 
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
+print(device)
 
 # Config
 model_dir = sys.argv[1]
