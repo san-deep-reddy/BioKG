@@ -7,7 +7,7 @@ from torch import nn
 from torch.nn import CrossEntropyLoss
 from transformers import LEDConfig, LEDPreTrainedModel, LEDPreTrainedModel 
 from transformers.modeling_outputs import BaseModelOutputWithPastAndCrossAttentions
-from transformers.models.led.modeling_led import LEDDecoder, LEDDecoderAttention, _expand_mask, _make_causal_mask, \
+from transformers.models.led.modeling_led import LEDDecoder, LEDDecoderAttention, _create_4d_causal_attention_mask, _prepare_4d_attention_mask_inverted, \
  ACT2FN, LEDEncoder , LEDSeq2SeqLMOutput, LEDSeq2SeqModelOutput, LEDEncoderBaseModelOutput, LEDLearnedPositionalEmbedding
 from typing import Optional, Tuple, Union
 
@@ -393,20 +393,22 @@ class LEDKDecoder(LEDPreTrainedModel):
         # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
         combined_attention_mask = None
         if input_shape[-1] > 1:
-            combined_attention_mask = _make_causal_mask(
-                input_shape, inputs_embeds.dtype, past_key_values_length=past_key_values_length
-            ).to(self.device)
+            combined_attention_mask = _create_4d_causal_attention_mask(
+                input_shape, inputs_embeds.dtype, inputs_embeds.device, past_key_values_length=past_key_values_length
+            )
 
         if attention_mask is not None and combined_attention_mask is not None:
             # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
-            combined_attention_mask = combined_attention_mask + _expand_mask(
+            combined_attention_mask = combined_attention_mask + _prepare_4d_attention_mask_inverted(
                 attention_mask, inputs_embeds.dtype, tgt_len=input_shape[-1]
             )
 
         # expand encoder attention mask
         if encoder_hidden_states is not None and encoder_attention_mask is not None:
             # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
-            encoder_attention_mask = _expand_mask(encoder_attention_mask, inputs_embeds.dtype, tgt_len=input_shape[-1])
+            encoder_attention_mask = _prepare_4d_attention_mask_inverted(
+                encoder_attention_mask, inputs_embeds.dtype, tgt_len=input_shape[-1]
+            )
 
         # embed positions
         positions = self.embed_positions(input_shape, past_key_values_length)
